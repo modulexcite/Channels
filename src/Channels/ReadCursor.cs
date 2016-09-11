@@ -10,8 +10,8 @@ namespace Channels
     {
         public static ReadCursor NotFound => default(ReadCursor);
 
-        private MemoryBlockSegment _segment;
-        private int _index;
+        private readonly MemoryBlockSegment _segment;
+        private readonly int _index;
 
         internal ReadCursor(MemoryBlockSegment segment)
         {
@@ -103,11 +103,18 @@ namespace Channels
             }
         }
 
-        internal int Seek(int bytes)
+        internal ReadCursor Seek(int bytes)
+        {
+            int count;
+            return Seek(bytes, out count);
+        }
+
+        internal ReadCursor Seek(int bytes, out int bytesSeeked)
         {
             if (IsEnd)
             {
-                return 0;
+                bytesSeeked = 0;
+                return this;
             }
 
             var wasLastBlock = _segment.Next == null;
@@ -115,8 +122,8 @@ namespace Channels
 
             if (following >= bytes)
             {
-                _index += bytes;
-                return bytes;
+                bytesSeeked = bytes;
+                return new ReadCursor(Segment, _index + bytes);
             }
 
             var segment = _segment;
@@ -125,9 +132,8 @@ namespace Channels
             {
                 if (wasLastBlock)
                 {
-                    _segment = segment;
-                    _index = index + following;
-                    return following;
+                    bytesSeeked = following;
+                    return new ReadCursor(segment, index + following);
                 }
                 else
                 {
@@ -141,20 +147,19 @@ namespace Channels
 
                 if (following >= bytes)
                 {
-                    _segment = segment;
-                    _index = index + bytes;
-                    return bytes;
+                    bytesSeeked = bytes;
+                    return new ReadCursor(segment, index + bytes);
                 }
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool TryGetBuffer(ReadCursor end, out MemoryBlockSpan span)
+        internal ReadCursor TryGetBuffer(ReadCursor end, out MemoryBlockSpan span)
         {
             if (IsDefault)
             {
                 span = default(MemoryBlockSpan);
-                return false;
+                return this;
             }
 
             var segment = _segment;
@@ -168,12 +173,11 @@ namespace Channels
                 {
                     span = new MemoryBlockSpan(segment.Block, index, following);
 
-                    _index = index + following;
-                    return true;
+                    return new ReadCursor(segment, index + following);
                 }
 
                 span = default(MemoryBlockSpan);
-                return false;
+                return this;
             }
             else
             {
@@ -181,7 +185,7 @@ namespace Channels
             }
         }
 
-        private bool TryGetBufferMultiBlock(ReadCursor end, out MemoryBlockSpan span)
+        private ReadCursor TryGetBufferMultiBlock(ReadCursor end, out MemoryBlockSpan span)
         {
             var segment = _segment;
             var index = _index;
@@ -214,7 +218,7 @@ namespace Channels
                 if (wasLastBlock)
                 {
                     span = default(MemoryBlockSpan);
-                    return false;
+                    return this;
                 }
                 else
                 {
@@ -224,10 +228,7 @@ namespace Channels
             }
 
             span = new MemoryBlockSpan(segment.Block, index, following);
-
-            _segment = segment;
-            _index = index + following;
-            return true;
+            return new ReadCursor(segment, index + following);
         }
 
         public override string ToString()

@@ -136,8 +136,7 @@ namespace Channels
                 if (found)
                 {
                     // TODO: Avoid extra seek
-                    start.Seek(seek);
-                    return start;
+                    return start.Seek(seek);
                 }
             }
 
@@ -147,23 +146,12 @@ namespace Channels
         public ReadableBuffer Slice(int start, int length)
         {
             var begin = _start;
-            if (start != 0)
-            {
-                begin.Seek(start);
-            }
-            var end = begin;
-            end.Seek(length);
-            return Slice(begin, end);
+            return Slice(begin.Seek(start), begin.Seek(length));
         }
 
         public ReadableBuffer Slice(int start, ReadCursor end)
         {
-            var begin = _start;
-            if (start != 0)
-            {
-                begin.Seek(start);
-            }
-            return Slice(begin, end);
+            return Slice(_start.Seek(start), end);
         }
 
         public ReadableBuffer Slice(ReadCursor start, ReadCursor end)
@@ -173,9 +161,7 @@ namespace Channels
 
         public ReadableBuffer Slice(ReadCursor start, int length)
         {
-            var end = start;
-            end.Seek(length);
-            return Slice(start, end);
+            return Slice(start, start.Seek(length));
         }
 
         public ReadableBuffer Slice(ReadCursor start)
@@ -187,9 +173,7 @@ namespace Channels
         {
             if (start == 0) return this;
 
-            var begin = _start;
-            begin.Seek(start);
-            return new ReadableBuffer(_channel, begin, _end);
+            return new ReadableBuffer(_channel, _start.Seek(start), _end);
         }
 
         public int Peek()
@@ -321,10 +305,10 @@ namespace Channels
 
             public bool MoveNext()
             {
-                var start = _buffer.Start;
-                bool moved = start.TryGetBuffer(_buffer.End, out _current);
+                var oldStart = _buffer.Start;
+                var start = oldStart.TryGetBuffer(_buffer.End, out _current);
                 _buffer = _buffer.Slice(start);
-                return moved;
+                return start != oldStart;
             }
 
             public void Reset()
